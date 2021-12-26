@@ -1,3 +1,6 @@
+// OpenStreetMaps still has the old mapillary IDs in their node data. Load the conversion tabls
+// This should not be needed anymore after OSM has done the migration. This code will be harmless
+// after that.
 function loadMapillaryConversion() {
   const xhr = new XMLHttpRequest()
   xhr.open('GET','/js/mapillary-v3-to-v4-conversion.json')
