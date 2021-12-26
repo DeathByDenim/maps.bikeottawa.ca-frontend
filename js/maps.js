@@ -1,3 +1,15 @@
+function loadMapillaryConversion() {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET','/js/mapillary-v3-to-v4-conversion.json')
+  xhr.onload = function() {
+    if (xhr.status == 200) {
+      mapillary_old_to_new = JSON.parse(xhr.responseText);
+    }
+  }
+  xhr.send()
+}
+let mapillary_old_to_new = {}
+loadMapillaryConversion()
 
 function addUpdatedDate(layerName){
   const request = new XMLHttpRequest()
@@ -139,7 +151,25 @@ displayOsmElementInfo = function (element, lngLat, showTags, changesetComment, t
           }
         }
         else{
-          popup+=`<li><div id="showMapillary"><a href="https://www.mapillary.com/app/?focus=photo&pKey=${mapval}" target="_blank"><img class="enlarge-onhover" src="https://d1cuyjsrcm0gby.cloudfront.net/${mapval}/thumb-640.jpg"></a></div></li>`
+          if(mapval in mapillary_old_to_new) {
+            mapval = mapillary_old_to_new[mapval];
+          }
+          popup+=`<li><div id="showMapillary"><a href="https://www.mapillary.com/app/?focus=photo&pKey=${mapval}" target="_blank"><img id="showMapillaryImg" class="enlarge-onhover" src="../img/loading.gif"></a></div></li>`
+          xhr2 = new XMLHttpRequest()
+          xhr2.open('GET',"https://graph.mapillary.com/" + mapval + "?access_token=" + mapillary_token + "&fields=id&fields=thumb_1024_url")
+          xhr2.onload = function() {
+            if(xhr2.status === 200) {
+              const result2 = JSON.parse(xhr2.responseText)
+              if(!result2.id || !result2.thumb_1024_url){
+                return
+              }
+              var mapillary_img =  document.getElementById('showMapillaryImg')
+              if(mapillary_img) {
+                mapillary_img.src = result2.thumb_1024_url //+ "&access_token=" + mapillary_token"
+              }
+            }
+          }
+          xhr2.send()
         }
 
         if(title!=''){
@@ -200,14 +230,27 @@ displayOsmElementInfo = function (element, lngLat, showTags, changesetComment, t
 
 function showMapillaryImage(lngLat) {
   const xhr = new XMLHttpRequest()
-  xhr.open('GET','https://a.mapillary.com/v3/images/?radius=15&per_page=1&client_id=TG1sUUxGQlBiYWx2V05NM0pQNUVMQTo2NTU3NTBiNTk1NzM1Y2U2&closeto='+lngLat.lng+','+lngLat.lat)
+  const bbox_size = 0.0001
+  xhr.open('GET','https://graph.mapillary.com/images?access_token=' + mapillary_token + '&fields=id&bbox=' + (+lngLat.lng-bbox_size/2) + ',' + (+lngLat.lat-bbox_size/2) + ',' + (+lngLat.lng+bbox_size/2) + ',' + (+lngLat.lat+bbox_size/2))
   xhr.onload = function () {
     if (xhr.status === 200) {
       const result = JSON.parse(xhr.responseText)
-      if(!result.features || result.features.length==0){
+      if(!result.data || result.data.length==0 || !result.data[0].id){
         return
       }
-      document.getElementById('showMapillary').innerHTML = '<a href="https://www.mapillary.com/app/?focus=photo&pKey='+result.features[0].properties.key+'" target="_blank"><img class="enlarge-onhover" src="https://d1cuyjsrcm0gby.cloudfront.net/'+result.features[0].properties.key+'/thumb-640.jpg"></a>'
+      const xhr2 = new XMLHttpRequest()
+      const image_id = result.data[0].id
+      xhr2.open('GET',"https://graph.mapillary.com/" + image_id + "?access_token=" + mapillary_token + "&fields=id&fields=thumb_1024_url")
+      xhr2.onload = function() {
+        if(xhr2.status === 200) {
+        const result2 = JSON.parse(xhr2.responseText)
+        if(!result2.id || !result2.thumb_1024_url){
+          return
+        }
+          document.getElementById('showMapillary').innerHTML = '<a href="https://www.mapillary.com/app/?focus=photo&pKey=' + result2.id + '" target="_blank"><img class="enlarge-onhover" src="' + result2.thumb_1024_url + '"></a>'
+        }
+      }
+      xhr2.send()
     }
   }
   xhr.send()
